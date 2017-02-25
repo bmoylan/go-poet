@@ -35,11 +35,15 @@ func (a *TypeAliasSpec) GetImports() []Import {
 }
 
 func (a *TypeAliasSpec) String() string {
-	writer := newCodeWriter()
-	if a.Comment != "" {
-		writer.WriteCodeBlock(Comment(a.Comment))
-	}
-	writer.WriteStatement(newStatement(0, 0, "type $T $T", a, a.UnderlyingType))
+	w := newCodeWriter()
+	w.WriteCodeBlock(a)
+	return w.String()
+}
 
-	return writer.String()
+// GetStatements returns the comment and the type definition.
+func (a *TypeAliasSpec) GetStatements() []Statement {
+	var s []Statement
+	s = append(s, Comment(a.Comment).GetStatements()...)
+	s = append(s, newStatement(0, 0, "type $T $T", a, a.UnderlyingType))
+	return s
 }

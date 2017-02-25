@@ -70,8 +70,10 @@ func (f *FileSpec) GlobalVariable(name string, typ TypeReference, format string,
 			Type: typ,
 		},
 		Constant: false,
-		Format:   format,
-		Args:     args,
+		InGroup:  false,
+		Value: &defaultCodeBlock{
+			statements: []Statement{newStatement(0, 0, format, args...)},
+		},
 	}
 	f.CodeBlocks = append(f.CodeBlocks, v)
 	return f
@@ -86,8 +88,10 @@ func (f *FileSpec) GlobalConstant(name string, typ TypeReference, format string,
 			Type: typ,
 		},
 		Constant: true,
-		Format:   format,
-		Args:     args,
+		InGroup:  false,
+		Value: &defaultCodeBlock{
+			statements: []Statement{newStatement(0, 0, format, args...)},
+		},
 	}
 	f.CodeBlocks = append(f.CodeBlocks, v)
 	return f
@@ -108,10 +112,9 @@ func (f *FileSpec) FileComment(comment string) *FileSpec {
 }
 
 func (f *FileSpec) writeHeader(w *codeWriter) {
-	if f.Comment != "" {
-		w.WriteCodeBlock(Comment(f.Comment))
-	}
-	w.WriteStatement(newStatement(0, 0, "package $L\n", f.Package))
+	w.WriteCodeBlock(Comment(f.Comment))
+	w.WriteStatement(newStatement(0, 0, "package $L", f.Package))
+	w.WriteStatement(Statement{})
 }
 
 func (f *FileSpec) writeImports(w *codeWriter) {
@@ -128,7 +131,8 @@ func (f *FileSpec) writeImports(w *codeWriter) {
 		}
 		w.WriteStatement(newStatement(0, 0, "$L$S", prefix, i.GetPackage()))
 	}
-	w.WriteStatement(newStatement(-1, 0, ")\n"))
+	w.WriteStatement(newStatement(-1, 0, ")"))
+	w.WriteStatement(Statement{})
 }
 
 func (f *FileSpec) writeInitFunc(w *codeWriter) {

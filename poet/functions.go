@@ -3,6 +3,7 @@ package poet
 import (
 	"bytes"
 	"fmt"
+	"io"
 )
 
 // FuncSpec represents information needed to write a function
@@ -28,86 +29,67 @@ func NewFuncSpec(name string) *FuncSpec {
 
 // String returns a string representation of the function
 func (f *FuncSpec) String() string {
-	writer := newCodeWriter()
-
-	if f.Comment != "" {
-		writer.WriteCodeBlock(Comment(f.Comment))
-	}
-
-	signature, args := f.Signature()
-	writer.WriteStatement(newStatement(0, 1, fmt.Sprintf("func %s {", signature), args...))
-
-	for _, st := range f.Statements {
-		writer.WriteStatement(st)
-	}
-
-	writer.WriteStatement(newStatement(-1, 0, "}"))
-
-	return writer.String()
+	w := newCodeWriter()
+	w.WriteCodeBlock(f)
+	return w.String()
 }
 
 // Signature returns a format string and slice of arguments for the function's signature, not
-// including the starting "func" or opening curly brace
+// including the starting "func", any receiver, or opening curly brace
 func (f *FuncSpec) Signature() (string, []interface{}) {
 	// create a buffer for the format string and a slice for the arguments to the format string
-	b := bytes.Buffer{}
-	arguments := []interface{}{}
+	b := &bytes.Buffer{}
+	var args []interface{}
 
-	// write the function name
-	b.WriteString(f.Name)
-	b.WriteString("(")
+	fmt.Fprint(b, "$L(")
+	args = append(args, f.Name)
+	args = append(args, writeParameters(b, f.Parameters)...)
+	fmt.Fprint(b, ")")
 
-	// write each parameter and collect any arguments
-	format, args := writeParameters(f.Parameters)
-	b.WriteString(format)
-	b.WriteString(")")
-	arguments = append(arguments, args...)
-
-	format, args = writeParameters(f.ResultParameters)
-	l := len(f.ResultParameters)
-
-	// if there is only one parameter and the parameter is unnamed, do not wrap it in parens
-	if l == 1 && f.ResultParameters[0].Name == "" {
-		b.WriteString(" ")
-		b.WriteString(format)
-	} else if l >= 1 {
-		b.WriteString(" (")
-		b.WriteString(format)
-		b.WriteString(")")
+	switch {
+	case len(f.ResultParameters) == 0:
+		break
+	case len(f.ResultParameters) == 1 && f.ResultParameters[0].Name == "":
+		// if there is only one parameter and the parameter is unnamed, do not wrap it in parens
+		fmt.Fprint(b, " ")
+		args = append(args, writeParameters(b, f.ResultParameters)...)
+	default:
+		fmt.Fprint(b, " (")
+		args = append(args, writeParameters(b, f.ResultParameters)...)
+		fmt.Fprint(b, ")")
 	}
-	arguments = append(arguments, args...)
 
-	return b.String(), arguments
+	return b.String(), args
 }
 
-func writeParameters(params []IdentifierParameter) (string, []interface{}) {
-	b := bytes.Buffer{}
-	args := []interface{}{}
+// writeParamters writes a format to w and returns arguments for the format.
+func writeParameters(w io.Writer, params []IdentifierParameter) []interface{} {
+	var args []interface{}
 
 	for i, p := range params {
 		// if the argument is named, add its name to the format string
 		if p.Name != "" {
-			b.WriteString("$L ")
+			fmt.Fprint(w, "$L ")
 			args = append(args, p.Name)
 		}
 
 		// add its type
-		b.WriteString("$T")
+		fmt.Fprint(w, "$T")
 		args = append(args, p.Type)
 
 		// if the argument is variadic, add the '...', will never happen for
 		// result parameters
 		if p.Variadic {
-			b.WriteString("...")
+			fmt.Fprint(w, "...")
 		}
 
 		// if its not the last parameter, add a comma
 		if i != len(params)-1 {
-			b.WriteString(", ")
+			fmt.Fprint(w, ", ")
 		}
 	}
 
-	return b.String(), args
+	return args
 }
 
 // GetImports returns a slice of imports that this function needs, including
@@ -132,6 +114,19 @@ func (f *FuncSpec) GetImports() []Import {
 	}
 
 	return packages
+}
+
+// GetStatements returns the Statements that make up the function.
+func (f *FuncSpec) GetStatements() []Statement {
+	signature, args := f.Signature()
+	sigFormat := fmt.Sprintf("func %s {", signature)
+
+	var s []Statement
+	s = append(s, Comment(f.Comment).GetStatements()...)
+	s = append(s, newStatement(0, 1, sigFormat, args...))
+	s = append(s, f.Statements...)
+	s = append(s, newStatement(-1, 0, "}"))
+	return s
 }
 
 // Statement is a convenient method to append a statement to the function

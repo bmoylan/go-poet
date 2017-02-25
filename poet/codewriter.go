@@ -9,12 +9,21 @@ import (
 type codeWriter struct {
 	buffer        bytes.Buffer
 	currentIndent int
+	importPath    string // the go import package this writer is writing to
 }
 
-// newCodeWriter constructs a new codeWriter
+// newCodeWriter constructs a new codeWriter writing to pkg.
 func newCodeWriter() *codeWriter {
 	return &codeWriter{
 		buffer: bytes.Buffer{},
+	}
+}
+
+// newCodeWriterWithImport constructs a new scodeWriter writing to pkg.
+func newCodeWriterWithImport(importPath string) *codeWriter {
+	return &codeWriter{
+		buffer:     bytes.Buffer{},
+		importPath: importPath,
 	}
 }
 
@@ -26,7 +35,9 @@ func (c *codeWriter) WriteCode(code string) {
 
 // WriteCodeBlock writes a code block at the given indentation
 func (c *codeWriter) WriteCodeBlock(block CodeBlock) {
-	c.WriteCode(block.String())
+	for _, s := range block.GetStatements() {
+		c.WriteStatement(s)
+	}
 }
 
 // WriteStatement writes a new line of code with the current indentation and augments
@@ -47,6 +58,17 @@ func newStatement(beforeIndent, afterIndent int, format string, args ...interfac
 		BeforeIndent: beforeIndent,
 		AfterIndent:  afterIndent,
 		Format:       format,
+		Arguments:    args,
+	}
+}
+
+// Appends two Statements without a newline.
+func appendStatements(first, second Statement) Statement {
+	args := append(first.Arguments, second.Arguments...)
+	return Statement{
+		BeforeIndent: first.BeforeIndent,
+		AfterIndent:  second.AfterIndent,
+		Format:       first.Format + second.Format,
 		Arguments:    args,
 	}
 }

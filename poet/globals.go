@@ -1,10 +1,5 @@
 package poet
 
-import (
-	"bytes"
-	"fmt"
-)
-
 // VariableGrouping represents a collection of variables and/or constants that will
 // be separated into groups on output.
 type VariableGrouping struct {
@@ -21,8 +16,10 @@ func (g *VariableGrouping) Variable(name string, typ TypeReference, format strin
 			Type: typ,
 		},
 		Constant: false,
-		Format:   format,
-		Args:     args,
+		InGroup:  true,
+		Value: &defaultCodeBlock{
+			statements: []Statement{newStatement(0, 0, format, args...)},
+		},
 	}
 	g.Variables = append(g.Variables, v)
 	return g
@@ -36,8 +33,10 @@ func (g *VariableGrouping) Constant(name string, typ TypeReference, format strin
 			Type: typ,
 		},
 		Constant: true,
-		Format:   format,
-		Args:     args,
+		InGroup:  true,
+		Value: &defaultCodeBlock{
+			statements: []Statement{newStatement(0, 0, format, args...)},
+		},
 	}
 	g.Variables = append(g.Variables, v)
 	return g
@@ -53,10 +52,15 @@ func (g *VariableGrouping) GetImports() []Import {
 }
 
 func (g *VariableGrouping) String() string {
-	buff := bytes.Buffer{}
+	w := newCodeWriter()
+	w.WriteCodeBlock(g)
+	return w.String()
+}
 
-	constants := []*Variable{}
-	vars := []*Variable{}
+func (g *VariableGrouping) GetStatements() []Statement {
+	var constants []*Variable
+	var vars []*Variable
+	var statements []Statement
 
 	for _, v := range g.Variables {
 		if v.Constant {
@@ -66,62 +70,83 @@ func (g *VariableGrouping) String() string {
 		}
 	}
 
-	if len(constants) > 0 {
-		buff.WriteString(writeGroupAsString("const", constants))
-	}
-
+	statements = append(statements, globalsAsStatements("const", constants)...)
 	// if both groups are populated, add a newline between them
 	if len(constants) > 0 && len(vars) > 0 {
-		buff.WriteString("\n")
+		statements = append(statements, Statement{})
 	}
+	statements = append(statements, globalsAsStatements("var", vars)...)
 
-	if len(vars) > 0 {
-		buff.WriteString(writeGroupAsString("var", vars))
-	}
-
-	return buff.String()
+	return statements
 }
 
-func writeGroupAsString(groupName string, vars []*Variable) string {
-	buf := bytes.Buffer{}
-
-	buf.WriteString(groupName + " (\n")
-	for _, v := range vars {
-		buf.WriteString("\t" + v.GetDeclaration())
+func globalsAsStatements(groupName string, vars []*Variable) []Statement {
+	if len(vars) == 0 {
+		return nil
 	}
-	buf.WriteString(")\n")
-	return buf.String()
+	var s []Statement
+	s = append(s, newStatement(0, 1, "$L (", groupName))
+	for _, v := range vars {
+		s = append(s, v.GetStatements()...)
+	}
+	s = append(s, newStatement(-1, 0, ")"))
+	return s
 }
 
 // Variable represents a variable, with name, type, and value.
 type Variable struct {
 	Identifier
+	Comment  Comment
 	Constant bool
-	Format   string
-	Args     []interface{}
+	InGroup  bool
+	Value    CodeBlock
 }
 
 var _ CodeBlock = (*Variable)(nil)
 
-// GetImports returns a slice of imports that this variable uses.
+// GetImports returns a slice of imports that this variable and its value uses.
 func (v *Variable) GetImports() []Import {
-	return v.Type.GetImports()
+	return append(v.Type.GetImports(), v.Value.GetImports()...)
 }
 
-// GetDeclaration returns the name and type of this variable, for example: 'foo string'.
-func (v *Variable) GetDeclaration() string {
-	w := newCodeWriter()
-	args := append([]interface{}{v.Name, v.Type}, v.Args...)
-	w.WriteStatement(newStatement(0, 0, "$L $T = "+v.Format, args...))
-	return w.String()
+// GetStatements returns Value.GetStatements() with the first
+// statement prepended with the variable declaration.
+func (v *Variable) GetStatements() []Statement {
+	valueStatements := v.Value.GetStatements()
+	if len(valueStatements) == 0 {
+		return []Statement{newStatement(0, 0, "$L$L $T", v.prefix(), v.Name, v.Type)}
+	}
+	assignment := newStatement(0, 0, "$L$L $T = ", v.prefix(), v.Name, v.Type)
+	valueStatements[0] = appendStatements(assignment, valueStatements[0])
+	return valueStatements
 }
 
 func (v *Variable) String() string {
-	var prefix string
-	if v.Constant {
-		prefix = "const"
-	} else {
-		prefix = "var"
+	w := newCodeWriter()
+	w.WriteCodeBlock(v)
+	return w.String()
+}
+
+// prefix returns (var |const ). Note trailing space!
+func (v *Variable) prefix() string {
+	if v.InGroup {
+		return ""
 	}
-	return fmt.Sprintf("%s %s", prefix, v.GetDeclaration())
+	if v.Constant {
+		return "const "
+	}
+	return "var "
+}
+
+type defaultCodeBlock struct {
+	imports    []Import
+	statements []Statement
+}
+
+func (b *defaultCodeBlock) GetImports() []Import {
+	return b.imports
+}
+
+func (b *defaultCodeBlock) GetStatements() []Statement {
+	return b.statements
 }

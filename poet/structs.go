@@ -34,14 +34,19 @@ func (s *StructSpec) GetName() string {
 	return s.Name
 }
 
+// String returns a string representation of the function
 func (s *StructSpec) String() string {
-	writer := newCodeWriter()
+	w := newCodeWriter()
+	w.WriteCodeBlock(s)
+	return w.String()
+}
 
-	if s.Comment != "" {
-		writer.WriteCodeBlock(Comment(s.Comment))
-	}
-
-	writer.WriteStatement(newStatement(0, 1, "type $L struct {", s.Name))
+// GetStatements returns the statements representing the struct declaration and
+// all of its methods.
+func (s *StructSpec) GetStatements() []Statement {
+	var statements []Statement
+	statements = append(statements, Comment(s.Comment).GetStatements()...)
+	statements = append(statements, newStatement(0, 1, "type $L struct {", s.Name))
 
 	for _, field := range s.Fields {
 		var format string
@@ -54,19 +59,21 @@ func (s *StructSpec) String() string {
 			format = "$L $T"
 		}
 
-		writer.WriteStatement(newStatement(0, 0, format, arguments...))
+		statements = append(statements, newStatement(0, 0, format, arguments...))
 	}
-	writer.WriteStatement(newStatement(-1, 0, "}"))
+	statements = append(statements, newStatement(-1, 0, "}"))
 
 	if len(s.Methods) != 0 {
-		writer.WriteStatement(Statement{})
+		// newline
+		statements = append(statements, Statement{})
 	}
 
 	for _, method := range s.Methods {
-		writer.WriteCodeBlock(method)
-		writer.WriteStatement(Statement{})
+		statements = append(statements, method.GetStatements()...)
+		statements = append(statements, Statement{})
 	}
-	return writer.String()
+
+	return statements
 }
 
 // StructComment adds a comment to this struct.

@@ -5,8 +5,6 @@ var _ TypeReference = (*InterfaceSpec)(nil)
 
 // InterfaceSpec represents an interface
 type InterfaceSpec struct {
-	// CodeBlock
-
 	Name               string
 	Comment            string
 	EmbeddedInterfaces []TypeReference
@@ -18,6 +16,12 @@ func NewInterfaceSpec(name string) *InterfaceSpec {
 	return &InterfaceSpec{
 		Name: name,
 	}
+}
+
+// InterfaceComment sets the comment for the interface.
+func (i *InterfaceSpec) InterfaceComment(comment string) *InterfaceSpec {
+	i.Comment = comment
+	return i
 }
 
 // Method adds a new method to the interface
@@ -52,27 +56,30 @@ func (i *InterfaceSpec) GetName() string {
 	return i.Name
 }
 
-// String outputs the interface declaration
+// String returns a string representation of the interface
 func (i *InterfaceSpec) String() string {
-	writer := newCodeWriter()
-	if i.Comment != "" {
-		writer.WriteCodeBlock(Comment(i.Comment))
-	}
-	writer.WriteStatement(newStatement(0, 1, "type $L interface {", i.Name))
+	w := newCodeWriter()
+	w.WriteCodeBlock(i)
+	return w.String()
+}
+
+// GetStatements returns the statements representing the interface declaration and
+// all of its methods.
+func (i *InterfaceSpec) GetStatements() []Statement {
+	var s []Statement
+	s = append(s, Comment(i.Comment).GetStatements()...)
+	s = append(s, newStatement(0, 1, "type $L interface {", i.Name))
 
 	for _, interf := range i.EmbeddedInterfaces {
-		writer.WriteStatement(newStatement(0, 0, "$L", interf.GetName()))
+		s = append(s, newStatement(0, 0, "$L", interf.GetName()))
 	}
 
-	for _, method := range i.Methods {
-		if method.Comment != "" {
-			writer.WriteStatement(newStatement(0, 0, "// $L", method.Comment))
-		}
-		signature, args := method.Signature()
-		writer.WriteStatement(newStatement(0, 0, signature, args...))
+	for _, m := range i.Methods {
+		s = append(s, Comment(m.Comment).GetStatements()...)
+		signature, args := m.Signature()
+		s = append(s, newStatement(0, 0, signature, args...))
 	}
 
-	writer.WriteStatement(newStatement(-1, 0, "}"))
-
-	return writer.String()
+	s = append(s, newStatement(-1, 0, "}"))
+	return s
 }

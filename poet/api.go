@@ -4,10 +4,10 @@ package poet
 
 // CodeBlock represent a block of code that can be included in a File
 type CodeBlock interface {
-	// String is the literal string serialization of the code.
-	String() string
 	// GetImports returns the imports required to use this code.
 	GetImports() []Import
+	// GetStatements returns a slice of the statements that make up the CodeBlock.
+	GetStatements() []Statement
 }
 
 // Statement represent a templated line of code.

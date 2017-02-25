@@ -19,7 +19,9 @@ func (f *VariablesSuite) TestVariable(c *C) {
 			Name: "c",
 			Type: TypeReferenceFromInstance(1),
 		},
-		Format: "$L", Args: []interface{}{1},
+		Value: &defaultCodeBlock{
+			statements: []Statement{newStatement(0, 0, "$L", 1)},
+		},
 	}
 	actual := variable.String()
 
@@ -31,21 +33,29 @@ func (f *VariablesSuite) TestVariableGrouping(c *C) {
 		"\tc int = 1\n" +
 		"\td int = 1\n" +
 		")\n"
+
 	variableA := &Variable{
 		Identifier: Identifier{
 			Name: "c",
 			Type: TypeReferenceFromInstance(1),
 		},
-		Format: "$L", Args: []interface{}{1},
+		Value: &defaultCodeBlock{
+			statements: []Statement{newStatement(0, 0, "$L", 1)},
+		},
+		InGroup: true,
 	}
 	variableB := &Variable{
 		Identifier: Identifier{
 			Name: "d",
 			Type: TypeReferenceFromInstance(1),
 		},
-		Format: "$L", Args: []interface{}{1},
+		Value: &defaultCodeBlock{
+			statements: []Statement{newStatement(0, 0, "$L", 1)},
+		},
+		InGroup: true,
 	}
 	variableGrouping := VariableGrouping{Variables: []*Variable{variableA, variableB}}
+
 	actual := variableGrouping.String()
 
 	c.Assert(actual, Equals, expected)
@@ -58,10 +68,12 @@ func (f *VariablesSuite) TestConstant(c *C) {
 			Name: "c",
 			Type: TypeReferenceFromInstance(1),
 		},
-		Format: "$L", Args: []interface{}{1}, Constant: true,
+		Constant: true,
+		Value: &defaultCodeBlock{
+			statements: []Statement{newStatement(0, 0, "$L", 1)},
+		},
 	}
 	actual := variable.String()
-
 	c.Assert(actual, Equals, expected)
 }
 
@@ -70,19 +82,28 @@ func (f *VariablesSuite) TestConstantGrouping(c *C) {
 		"\tc int = 1\n" +
 		"\td int = 1\n" +
 		")\n"
+
 	variableA := &Variable{
 		Identifier: Identifier{
 			Name: "c",
 			Type: TypeReferenceFromInstance(1),
 		},
-		Format: "$L", Args: []interface{}{1}, Constant: true,
+		Value: &defaultCodeBlock{
+			statements: []Statement{newStatement(0, 0, "$L", 1)},
+		},
+		Constant: true,
+		InGroup:  true,
 	}
 	variableB := &Variable{
 		Identifier: Identifier{
 			Name: "d",
 			Type: TypeReferenceFromInstance(1),
 		},
-		Format: "$L", Args: []interface{}{1}, Constant: true,
+		Value: &defaultCodeBlock{
+			statements: []Statement{newStatement(0, 0, "$L", 1)},
+		},
+		Constant: true,
+		InGroup:  true,
 	}
 	variableGrouping := VariableGrouping{Variables: []*Variable{variableA, variableB}}
 	actual := variableGrouping.String()
@@ -143,19 +164,27 @@ func (f *VariablesSuite) TestConstantGroupingMixed(c *C) {
 		"var (\n" +
 		"\td int = 1\n" +
 		")\n"
+
 	variableA := &Variable{
 		Identifier: Identifier{
 			Name: "c",
 			Type: TypeReferenceFromInstance(1),
 		},
-		Format: "$L", Args: []interface{}{1}, Constant: true,
+		Value: &defaultCodeBlock{
+			statements: []Statement{newStatement(0, 0, "$L", 1)},
+		},
+		Constant: true,
+		InGroup:  true,
 	}
 	variableB := &Variable{
 		Identifier: Identifier{
 			Name: "d",
 			Type: TypeReferenceFromInstance(1),
 		},
-		Format: "$L", Args: []interface{}{1}, Constant: false,
+		Value: &defaultCodeBlock{
+			statements: []Statement{newStatement(0, 0, "$L", 1)},
+		},
+		InGroup: true,
 	}
 	variableGrouping := VariableGrouping{Variables: []*Variable{variableA, variableB}}
 	actual := variableGrouping.String()

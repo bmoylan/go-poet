@@ -24,19 +24,24 @@ func NewMethodSpec(name, receiverName string, receiver TypeReference) *MethodSpe
 	}
 }
 
-func (m *MethodSpec) String() string {
-	writer := newCodeWriter()
+func (m *MethodSpec) GetStatements() []Statement {
+	signature, args := m.FuncSpec.Signature()
 
-	signature, args := m.Signature()
-	format := fmt.Sprintf("func ($L $T) %s {", signature)
+	// add method receiver
+	signature = fmt.Sprintf("func ($L $T) %s {", signature)
 	args = append([]interface{}{m.ReceiverName, m.Receiver}, args...)
-	writer.WriteStatement(newStatement(0, 1, format, args...))
 
-	for _, st := range m.Statements {
-		writer.WriteStatement(st)
-	}
+	var s []Statement
+	s = append(s, Comment(m.Comment).GetStatements()...)
+	s = append(s, newStatement(0, 1, signature, args...))
+	s = append(s, m.Statements...)
+	s = append(s, newStatement(-1, 0, "}"))
+	return s
+}
 
-	writer.WriteStatement(newStatement(-1, 0, "}"))
-
-	return writer.String()
+// String returns a string representation of the function
+func (m *MethodSpec) String() string {
+	w := newCodeWriter()
+	w.WriteCodeBlock(m)
+	return w.String()
 }
